@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <ble.h>
 
-#define UNKNOWN_SERVICE_UUID "00001530-0000-3512-2118-0009af100700"
 #define UNKNOWN_UUID        "00001543-0000-3512-2118-0009af100700"
 
 BLE ble_client;
