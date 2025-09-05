@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "common.h"
+#include "flag.h"
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -36,12 +37,8 @@ public:
     bool connected () { return ble_client->isConnected(); };
     int  scanDevices ();
     bool addNewCharacteristic (String service_uuid, String CHARACTERISTIC_UUID);
-    void reconnect () {
-        if (ble_client != nullptr && !ble_client->isConnected()) {
-            ble_client->connect(&ble_device_found);
-        }
-    };
-    bool getAddress (String device_name);
+    bool reconnect ();
+    bool connectDevice (String device_name);
     int  registCharacteristic (String service_uuid, String char_uuid);
     BLE_Callback_Data getData ();
     static void callback_function(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* data, size_t length, bool isNotify);
@@ -57,3 +54,5 @@ private:
     int nb_of_services = 0;
     bool ble_connected = false;
 };
+
+extern QueueHandle_t data_queue;

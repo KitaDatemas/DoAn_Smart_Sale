@@ -2,7 +2,7 @@
 
 int data_length = 0;
 uint8_t ble_data[256] = {0};
-QueueHandle_t data_queue = xQueueCreate(256, sizeof(BLE_Callback_Data));
+QueueHandle_t data_queue  = nullptr;
 
 class ClientCallback : public BLEClientCallbacks {
     void onConnect(BLEClient* pclient) override {
@@ -19,31 +19,31 @@ BLE::BLE() : role(BLE_CLIENT), is_initialized(false), ble_client (nullptr), ble_
 void BLE::callback_function(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* data, size_t length, bool isNotify) {
   BLE_Callback_Data callback_data;
   callback_data.UUID[0] = 0;
-  DEBUG_PRINTF("Callback for characteristic %s of length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
+//   DEBUG_PRINTF("Callback for characteristic %s of length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
   strcpy(callback_data.UUID, pBLERemoteCharacteristic->getUUID().toString().c_str());
   callback_data.data_length = length;
   memcpy(callback_data.data, data, length);
-  xQueueSend(data_queue, &callback_data, pdMS_TO_TICKS(50));
+  if (data_queue != nullptr)
+    xQueueSend(data_queue, &callback_data, pdMS_TO_TICKS(50));
+  else
+    DEBUG_PRINTLN("Data queue is null");
+  // Wake up task updating scale update data in Scale Service
+  xEventGroupSetBitsFromISR(ble_event_group, 0x01, NULL);
 }
 
 bool BLE::init(BLE_ROLE ble_role)
 {
     this->role = ble_role;
+    data_queue = xQueueCreate(256, sizeof(BLE_Callback_Data));
     switch (role)
     {
     case BLE_CLIENT:
-        initClient();
-        break;
+        return initClient();
 
     case BLE_SERVER:
-        initServer();
-        break;
-
-    default:
-        return false;
-        break;
+        return initServer();
     }
-    return true;
+    return false;
 }
 
 bool BLE::initClient()
@@ -68,7 +68,7 @@ int BLE::scanDevices()
     // Retrieve scan object
     BLEScan * scan_object = ble_device.getScan ();
     scan_object->setActiveScan(true);
-    // Start scanning for 5 seconds
+    // Start scanning for 3 seconds
     BLEScanResults scan_result = scan_object->start (3);
     
     DEBUG_PRINTLN("Bluetooth device list:");
@@ -97,12 +97,12 @@ bool BLE::addNewCharacteristic (String service_uuid, String CHARACTERISTIC_UUID)
     return true;
 }
 
-bool BLE::getAddress (String device_name) {
+bool BLE::connectDevice (String device_name) {
     // Retrieve scan object
     BLEScan * scan_object = ble_device.getScan ();
     scan_object->setActiveScan(true);
-    // Start scanning for 5 seconds
-    BLEScanResults scan_result = scan_object->start (5);
+    // Start scanning for 3 seconds
+    BLEScanResults scan_result = scan_object->start (3);
     
     DEBUG_PRINTLN("Bluetooth device list:");
     for (int device_idx = 0; device_idx < scan_result.getCount(); device_idx++) {
@@ -117,6 +117,13 @@ bool BLE::getAddress (String device_name) {
             ble_client->connect(&scan_device);
             return true;
         }
+    }
+    return false;
+}
+
+bool BLE::reconnect () {
+    if (ble_client != nullptr && !ble_client->isConnected()) {
+        return ble_client->connect(&ble_device_found);
     }
     return false;
 }
